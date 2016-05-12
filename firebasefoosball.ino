@@ -29,8 +29,10 @@
 #define       INTERVAL_ANIMATION    20
 #define       INTERVAL_CHECKSCORE   1000
 
+
 String        DATA_PAYLOAD        = "{\".sv\": \"timestamp\"}";
-String        DATA_AUTH           = "?auth=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE0NjU2NjMwMDksInYiOjAsImQiOnsidWlkIjoiYmFuYW5hIn0sImlhdCI6MTQ2MzA3MTAwOX0.qEaQ0mSFd48a_NiUIX53OI6PuLKOOFRvJ9akcBMEKH4";
+// String        DATA_AUTH         = "?auth=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE0NjU2NjMwMDksInYiOjAsImQiOnsidWlkIjoiYmFuYW5hIn0sImlhdCI6MTQ2MzA3MTAwOX0.qEaQ0mSFd48a_NiUIX53OI6PuLKOOFRvJ9akcBMEKH4";
+String DATA_AUTH = "";
 String        DATA_NAME           = "https://functions-prerelease-11-bb35b.firebaseio.com";
 String        MSG_BANNER          = "fireboy";
 int           game_started        = 0;
@@ -64,6 +66,9 @@ void setup() {
   pixel_strip2.show();
   Serial.println("setup complete.");
   listen_table();
+  animate_strips(0x00FF00);
+  animate_strips(0xFF0000);
+  animate_strips(0x0000FF);
 }
 
 void loop() {
@@ -93,7 +98,7 @@ void iter_display() {
 }
 
 void iter_processes() {
-  if (game_proc.available()) {   
+  if (game_proc.available()) {
     String s = game_proc.readStringUntil('\n');
     Serial.println("game:" + s);
     // data: {"path":"/","data":"/games/-KH2s6AVIfHOwixsDQuF"}
@@ -134,29 +139,23 @@ void iter_processes() {
   }
   if (game_started && !score_proc.running()) {
     game_started = 0;
-    listen_table();
   }
 }
 
 void listen_table() {
   board_id = get_yun_mac();
-  Serial.println("listening");
-  String cmd = "curl --no-buffer -L -k -H 'Accept: text/event-stream' '" + DATA_NAME + "/tables/" + board_id + "/current_game.json" + DATA_AUTH + "'";
-  Serial.println(cmd);
-  if (game_proc.running()) {
-    game_proc.close();
-  }
-  game_proc.runShellCommandAsynchronously(cmd); 
+  Serial.println("listening on:" + board_id);
+  //if (game_proc.running()) {
+  //  game_proc.close();
+  //}
+  game_proc.runShellCommandAsynchronously("curl --no-buffer -L -k -H 'Accept: text/event-stream' '" + DATA_NAME + "/tables/" + board_id + "/current_game.json" + DATA_AUTH + "'");
 }
 
 void listen_game(String game_id) {
-  Serial.println("listening to a game");
-  String cmd = "curl --no-buffer -L -k -H 'Accept: text/event-stream' '" + DATA_NAME + game_id + ".json" + DATA_AUTH + "'";
-  Serial.println(cmd);
   if (score_proc.running()) {
     score_proc.close();
   }
-  score_proc.runShellCommandAsynchronously(cmd);
+  score_proc.runShellCommandAsynchronously("curl --no-buffer -L -k -H 'Accept: text/event-stream' '" + DATA_NAME + game_id + ".json" + DATA_AUTH + "'");
 }
 
 String get_yun_mac() {
@@ -168,7 +167,7 @@ String get_yun_mac() {
     s.trim();
   }
   Serial.println("YUN MAC is: " + s + "|");
-  board_id = s;
+  return s;
 }
 
 void set_score1(int score) {
@@ -205,12 +204,14 @@ void set_score2(int score) {
 
 void animate_strips(uint32_t color) {
   for (int i = 0; i < NUM_PIXELS; i++) {
+    delay(20);
     pixel_strip1.setPixelColor(i, color);
     pixel_strip2.setPixelColor(i, color);
     pixel_strip1.show();
     pixel_strip2.show();      
   }
   for (int i = 0; i < NUM_PIXELS; i++) {
+    delay(20);
     pixel_strip1.setPixelColor(NUM_PIXELS - i - 1, 0);     
     pixel_strip2.setPixelColor(NUM_PIXELS - i - 1, 0);      
     pixel_strip1.show();
@@ -219,7 +220,7 @@ void animate_strips(uint32_t color) {
 }
 
 void send_button_click(int button_index) {
-  String url = DATA_NAME + "/switches/" + button_names[button_index] + "/hits.json" + DATA_AUTH;
+  String url = DATA_NAME + "/switches/" + button_names[button_index] + "-"+ board_id + "/hits.json";
   Serial.println(url);
   HttpClient client;
   client.noCheckSSL();
@@ -231,7 +232,7 @@ void send_button_click(int button_index) {
 }
 
 void update_display() {
-  u8g.setFont(u8g_font_profont22);
+  u8g.setFont(u8g_font_profont10);
   u8g.setPrintPos(15, 15);
   u8g.print(MSG_BANNER);
   //u8g.setFont(u8g_font_profont10);
