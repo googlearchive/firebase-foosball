@@ -18,6 +18,8 @@
 #include <HttpClient.h>
 #include "U8glib.h"
 #include <elapsedMillis.h>
+#include <FileIO.h>
+
 
 #define       PIN_DATA1             4
 #define       PIN_CLK1              5
@@ -43,6 +45,7 @@ int           button_pins[]       = {A0, A1, A2, A3};
 const char*   button_names[]      = {"B0", "B1", "B2", "B3"};
 int           button_values[]     = {HIGH, HIGH, HIGH, HIGH};
 elapsedMillis network_timer;
+elapsedMillis score_timer;
 Process       game_proc;
 Process       score_proc;
 HttpClient    button_client;
@@ -56,7 +59,7 @@ U8GLIB_SH1106_128X64 u8g(U8G_I2C_OPT_DEV_0|U8G_I2C_OPT_FAST);
 Adafruit_DotStar pixel_strip1 = Adafruit_DotStar(NUM_PIXELS, PIN_DATA1, PIN_CLK1, DOTSTAR_BGR);
 Adafruit_DotStar pixel_strip2 = Adafruit_DotStar(NUM_PIXELS, PIN_DATA2, PIN_CLK2, DOTSTAR_BGR);
 
-#define DEBUG 0
+#define DEBUG 1
 
 void setup() {
   if (DEBUG) {
@@ -64,7 +67,8 @@ void setup() {
     while (!Serial) {}
     Serial.println("setup started");
   }
-  Bridge.begin();  
+  Bridge.begin();
+  FileSystem.begin();
   for (int i = 0; i < NUM_BUTTONS; i++) {
     pinMode(button_pins[i], INPUT_PULLUP);
   }
@@ -72,7 +76,7 @@ void setup() {
   pixel_strip2.begin();
   pixel_strip1.show();
   pixel_strip2.show();
-  listen_table();
+  //listen_table();
   animate_strips(0xFFFFFF);
   animate_strips(0xFFFFFF);
   if (DEBUG) Serial.println("setup complete");
@@ -83,6 +87,7 @@ void loop() {
   iter_buttons();
   iter_display();
   iter_processes();
+  iter_timers();
 }
 
 void iter_buttons() {
@@ -113,6 +118,22 @@ void iter_display() {
   do {
     update_display();
   } while( u8g.nextPage() );
+}
+
+void check_score() {
+  File f = FileSystem.open("/tmp/firescore", FILE_READ);
+  String s1 = f.readStringUntil(' ');
+  String s2 = f.readString();
+  set_score1(s1.toInt());
+  set_score2(s2.toInt());
+  Serial.println("score:" + s1 + ":" + s2 + "|");
+}
+
+void iter_timers() {
+  if (score_timer > 2000) {
+    check_score();
+    score_timer = 0;
+  }
 }
 
 void iter_processes() {
